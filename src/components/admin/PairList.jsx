@@ -40,7 +40,12 @@ export default function PairList({ pairs, members, onAdd, onUpdate, onDelete }) 
             return (
               <div key={pair.id} className={`flex items-center justify-between rounded-xl px-4 py-3 border ${cls.bg} ${cls.border}`}>
                 <div>
-                  <div className={`font-medium text-sm ${cls.text}`}>{pair.name}</div>
+                  <div className={`font-medium text-sm ${cls.text} flex items-center gap-1.5`}>
+                    {pair.name}
+                    {pair._draft && (
+                      <span title="Pending publish" className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                    )}
+                  </div>
                   <div className="text-xs text-gray-500 mt-0.5">{(pair.members || []).join(', ')}</div>
                 </div>
                 <div className="flex gap-2">

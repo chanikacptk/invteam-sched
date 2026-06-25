@@ -8,12 +8,9 @@ const DOT_LABELS = ['M', 'T', 'W', 'T', 'F']
 
 function getDeskLabel(member) {
   if (member.desk_row == null || member.desk_col == null) return null
-  const cluster = member.desk_row <= 1 ? 'Left' : 'Right'
-  const col = member.desk_row <= 1 ? member.desk_col + 1 : member.desk_col - 5
-  const row = member.desk_row <= 1
-    ? (member.desk_row === 0 ? 'A' : 'B')
-    : (member.desk_row === 4 ? 'A' : 'B')
-  return `${cluster} ${row}${col}`
+  const cluster = member.desk_row <= 1 ? 'Top' : 'Bottom'
+  const rowLetter = member.desk_row === 0 || member.desk_row === 4 ? 'A' : 'B'
+  return `${cluster} ${rowLetter} (r${member.desk_row},c${member.desk_col})`
 }
 
 export default function MemberList({ members, pairs = [], onAdd, onUpdate, onDelete }) {
@@ -72,6 +69,9 @@ export default function MemberList({ members, pairs = [], onAdd, onUpdate, onDel
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-gray-900 text-sm">{member.name}</span>
+                    {member._draft && (
+                      <span title="Pending publish" className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                    )}
                     {pair && (
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${pairCls.bg} ${pairCls.text}`}>
                         {pair.name}

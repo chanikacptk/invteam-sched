@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useMembers } from '../hooks/useMembers'
 import { usePairs } from '../hooks/usePairs'
 import { useOverrides } from '../hooks/useOverrides'
+import { useHolidays } from '../hooks/useHolidays'
 import StatsBar from '../components/viewer/StatsBar'
 import FloorView from '../components/viewer/FloorView'
 import WeekCalendar from '../components/viewer/WeekCalendar'
 import MonthCalendar from '../components/viewer/MonthCalendar'
 import { StatsBarSkeleton, ListSkeleton } from '../components/Skeleton'
-import { getWeekDates, formatDate, getAttendanceStatus, PAIR_COLORS, PAIR_COLOR_CLASSES } from '../lib/scheduleUtils'
+import { getWeekDates, formatDate, getAttendanceStatus, getHoliday, PAIR_COLORS, PAIR_COLOR_CLASSES } from '../lib/scheduleUtils'
 
 const VIEWS = ['Month', 'Week', 'Floor']
 
@@ -21,11 +22,15 @@ export default function ViewerPage() {
   const { pairs, loading: pairsLoading } = usePairs()
   const loading = membersLoading || pairsLoading
 
+  const weekDates = getWeekDates(selectedDate)
   const monthStart = formatDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))
   const monthEnd   = formatDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0))
-  const { overrides } = useOverrides({ from: monthStart, to: monthEnd })
-
-  const weekDates = getWeekDates(selectedDate)
+  const weekStart  = formatDate(weekDates[0])
+  const weekEnd    = formatDate(weekDates[4])
+  const overrideFrom = weekStart < monthStart ? weekStart : monthStart
+  const overrideTo   = weekEnd   > monthEnd   ? weekEnd   : monthEnd
+  const { overrides } = useOverrides({ from: overrideFrom, to: overrideTo })
+  const { holidays } = useHolidays()
   const weekLabel = `${weekDates[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${weekDates[4].toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
   const monthLabel = selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })
 
@@ -96,7 +101,7 @@ export default function ViewerPage() {
           </>
         ) : (
           <>
-            <StatsBar members={members} overrides={overrides} selectedDate={selectedDate} />
+            <StatsBar members={members} overrides={overrides} holidays={holidays} selectedDate={selectedDate} />
 
             {calView === 'floor' && (
               <div className="overflow-x-auto">
@@ -105,6 +110,7 @@ export default function ViewerPage() {
                     members={members}
                     pairs={pairs}
                     overrides={overrides}
+                    holidays={holidays}
                     weekDates={weekDates}
                   />
                 </div>
@@ -118,6 +124,7 @@ export default function ViewerPage() {
                     members={members}
                     pairs={pairs}
                     overrides={overrides}
+                    holidays={holidays}
                     weekStart={selectedDate}
                     onDayClick={setDayPanel}
                   />
@@ -130,6 +137,7 @@ export default function ViewerPage() {
                 members={members}
                 pairs={pairs}
                 overrides={overrides}
+                holidays={holidays}
                 year={selectedDate.getFullYear()}
                 month={selectedDate.getMonth()}
                 onDayClick={setDayPanel}
@@ -153,12 +161,19 @@ export default function ViewerPage() {
               <button onClick={() => setDayPanel(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
             </div>
 
+            {getHoliday(dayPanel, holidays) && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700 mb-4">
+                🇹🇭 {getHoliday(dayPanel, holidays).name_en}
+              </div>
+            )}
+
             {[
-              { status: 'wfo',   label: 'In Office', color: 'emerald' },
-              { status: 'leave', label: 'On Leave',  color: 'amber' },
-              { status: 'wfh',   label: 'WFH',       color: 'gray' },
+              { status: 'wfo',     label: 'In Office', color: 'emerald' },
+              { status: 'leave',   label: 'On Leave',  color: 'amber' },
+              { status: 'holiday', label: 'Holiday',   color: 'sky' },
+              { status: 'wfh',     label: 'WFH',       color: 'gray' },
             ].map(({ status, label, color }) => {
-              const group = members.filter(m => getAttendanceStatus(m, dayPanel, overrides) === status)
+              const group = members.filter(m => getAttendanceStatus(m, dayPanel, overrides, holidays) === status)
               if (group.length === 0) return null
               return (
                 <div key={status} className="mb-5">

@@ -24,14 +24,24 @@ export function isInOffice(member, dayKey, weekIndex) {
 }
 
 export function formatDate(date) {
-  return date.toISOString().split('T')[0]
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
-export function getAttendanceStatus(member, date, overrides) {
+export function getHoliday(date, holidays) {
+  const dateStr = formatDate(date)
+  return (holidays || []).find(h => h.date === dateStr && h.is_observed) || null
+}
+
+export function getAttendanceStatus(member, date, overrides, holidays) {
   const override = (overrides || []).find(
     o => o.member_id === member.id && o.date === formatDate(date)
   )
   if (override) return override.status
+
+  if (getHoliday(date, holidays)) return 'holiday'
 
   const dayKey = DAY_KEYS[date.getDay()]
   const weekIndex = getWeekIndex(date)
@@ -49,6 +59,15 @@ export function getWeekDates(referenceDate) {
     return date
   })
 }
+
+export const STATUS_COLOR_CLASSES = {
+  wfo:     { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  wfh:     { bg: 'bg-gray-50',    text: 'text-gray-400',    dot: 'bg-gray-300' },
+  leave:   { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-400' },
+  holiday: { bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-400' },
+}
+
+export const STATUS_LABELS = { wfo: 'WFO', wfh: 'WFH', leave: 'On Leave', holiday: 'Holiday' }
 
 export const PAIR_COLORS = ['violet', 'pink', 'cyan', 'orange', 'amber', 'red']
 

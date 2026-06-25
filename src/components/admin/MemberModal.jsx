@@ -27,10 +27,9 @@ function patternToDays(pattern) {
 }
 
 function deskLabel(slot) {
-  const cluster = slot.row <= 1 ? 'Left' : 'Right'
-  const col = slot.row <= 1 ? slot.col + 1 : slot.col - 5
-  const row = slot.row <= 1 ? (slot.row === 0 ? 'A' : 'B') : (slot.row === 4 ? 'A' : 'B')
-  return `${cluster} ${row}${col}`
+  const cluster = slot.row <= 1 ? 'Top' : 'Bottom'
+  const rowLetter = slot.row === 0 || slot.row === 4 ? 'A' : 'B'
+  return `${cluster} ${rowLetter} (row ${slot.row}, col ${slot.col})`
 }
 
 export default function MemberModal({ member, onSave, onClose }) {
@@ -175,16 +174,16 @@ export default function MemberModal({ member, onSave, onClose }) {
               onChange={e => handleDeskChange(e.target.value)}
             >
               <option value="">— No desk assigned —</option>
-              <optgroup label="Cluster Left">
-                {DESK_SLOTS.filter(s => s.row <= 1).map((s, _, arr) => {
+              <optgroup label="Top block">
+                {DESK_SLOTS.filter(s => s.row <= 1).map(s => {
                   const idx = DESK_SLOTS.indexOf(s)
-                  return <option key={idx} value={idx}>{deskLabel(s)} (row {s.row}, col {s.col})</option>
+                  return <option key={idx} value={idx}>{deskLabel(s)}</option>
                 })}
               </optgroup>
-              <optgroup label="Cluster Right">
+              <optgroup label="Bottom block">
                 {DESK_SLOTS.filter(s => s.row >= 4).map(s => {
                   const idx = DESK_SLOTS.indexOf(s)
-                  return <option key={idx} value={idx}>{deskLabel(s)} (row {s.row}, col {s.col})</option>
+                  return <option key={idx} value={idx}>{deskLabel(s)}</option>
                 })}
               </optgroup>
             </select>

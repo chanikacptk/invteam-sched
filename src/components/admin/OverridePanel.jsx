@@ -1,17 +1,26 @@
 import { useState } from 'react'
-import { formatDate, getWeekIndex, isInOffice, DAY_KEYS } from '../../lib/scheduleUtils'
+import { formatDate, getWeekIndex, isInOffice, getHoliday, DAY_KEYS } from '../../lib/scheduleUtils'
 
 const STATUS_OPTIONS = [
-  { key: 'wfo', label: 'WFO', active: 'bg-emerald-600 text-white border-emerald-600', inactive: 'bg-white text-gray-500 border-gray-300 hover:border-emerald-400' },
-  { key: 'wfh', label: 'WFH', active: 'bg-gray-500 text-white border-gray-500', inactive: 'bg-white text-gray-500 border-gray-300 hover:border-gray-400' },
-  { key: 'leave', label: 'Leave', active: 'bg-amber-400 text-white border-amber-400', inactive: 'bg-white text-gray-500 border-gray-300 hover:border-amber-300' },
+  { key: 'wfo',   label: 'WFO',   active: 'bg-emerald-600 text-white border-emerald-600', inactive: 'bg-white text-gray-500 border-gray-300 hover:border-emerald-400' },
+  { key: 'wfh',   label: 'WFH',   active: 'bg-gray-500 text-white border-gray-500',       inactive: 'bg-white text-gray-500 border-gray-300 hover:border-gray-400' },
+  { key: 'leave', label: 'Leave', active: 'bg-amber-400 text-white border-amber-400',     inactive: 'bg-white text-gray-500 border-gray-300 hover:border-amber-300' },
 ]
 
-export default function OverridePanel({ member, date, overrides, onSet, onRemove, onClose }) {
+const STATUS_LABEL = { wfo: 'WFO', wfh: 'WFH', leave: 'On Leave', holiday: 'Holiday' }
+const STATUS_COLOR = {
+  wfo:     'text-emerald-700 bg-emerald-50',
+  wfh:     'text-gray-600 bg-gray-100',
+  leave:   'text-amber-700 bg-amber-50',
+  holiday: 'text-sky-700 bg-sky-50',
+}
+
+export default function OverridePanel({ member, date, overrides, holidays, onSet, onRemove, onClose }) {
   const override = overrides.find(o => o.member_id === member.id && o.date === formatDate(date))
   const dayKey = DAY_KEYS[date.getDay()]
   const weekIndex = getWeekIndex(date)
-  const scheduledStatus = isInOffice(member, dayKey, weekIndex) ? 'wfo' : 'wfh'
+  const holiday = getHoliday(date, holidays)
+  const scheduledStatus = holiday ? 'holiday' : (isInOffice(member, dayKey, weekIndex) ? 'wfo' : 'wfh')
 
   const [status, setStatus] = useState(override?.status || scheduledStatus)
   const [note, setNote] = useState(override?.note || '')
@@ -26,7 +35,7 @@ export default function OverridePanel({ member, date, overrides, onSet, onRemove
     onClose()
   }
 
-  async function handleClear() {
+  async function handleReset() {
     setSaving(true)
     await onRemove(member.id, formatDate(date))
     setSaving(false)
@@ -34,9 +43,7 @@ export default function OverridePanel({ member, date, overrides, onSet, onRemove
   }
 
   return (
-    /* Slide-in panel — fixed to the right side */
     <div className="fixed inset-y-0 right-0 z-50 flex">
-      {/* Backdrop — clicking outside closes */}
       <div className="fixed inset-0 bg-black/20" onClick={onClose} />
 
       <div className="relative ml-auto w-80 bg-white shadow-2xl flex flex-col h-full">
@@ -50,19 +57,45 @@ export default function OverridePanel({ member, date, overrides, onSet, onRemove
         </div>
 
         {/* Body */}
-        <div className="flex-1 p-5 overflow-y-auto">
-          {/* Schedule says */}
-          <div className="bg-gray-50 rounded-lg px-3 py-2 mb-4 text-sm">
-            <span className="text-gray-500">Schedule says: </span>
-            <span className="font-semibold text-gray-800">{scheduledStatus === 'wfo' ? 'WFO' : 'WFH'}</span>
-            {override && (
-              <span className="ml-2 text-xs text-amber-600 font-semibold bg-amber-50 px-1.5 py-0.5 rounded">overridden</span>
-            )}
-          </div>
+        <div className="flex-1 p-5 overflow-y-auto space-y-4">
 
-          {/* Override status toggle */}
-          <div className="mb-4">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Override</div>
+          {/* Holiday note */}
+          {holiday && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-xs text-sky-700">
+              🇹🇭 {holiday.name_en} — company holiday, everyone defaults to off unless overridden.
+            </div>
+          )}
+
+          {/* Current status info box */}
+          {override ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+                  {override._draft ? 'Draft — not yet published' : 'Manually overridden'}
+                </span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[override.status]}`}>
+                  {STATUS_LABEL[override.status]}
+                </span>
+              </div>
+              {override.note && (
+                <div className="text-xs text-amber-800 italic">"{override.note}"</div>
+              )}
+              <div className="text-xs text-amber-600 pt-0.5">
+                Schedule would be: <span className="font-semibold">{STATUS_LABEL[scheduledStatus]}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between">
+              <span className="text-xs text-gray-500">Following schedule</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[scheduledStatus]}`}>
+                {STATUS_LABEL[scheduledStatus]}
+              </span>
+            </div>
+          )}
+
+          {/* Override toggle */}
+          <div>
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Set override</div>
             <div className="flex gap-2">
               {STATUS_OPTIONS.map(opt => (
                 <button
@@ -78,7 +111,7 @@ export default function OverridePanel({ member, date, overrides, onSet, onRemove
           </div>
 
           {/* Note */}
-          <div className="mb-6">
+          <div>
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Note (optional)</div>
             <input
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -89,7 +122,7 @@ export default function OverridePanel({ member, date, overrides, onSet, onRemove
           </div>
         </div>
 
-        {/* Footer actions */}
+        {/* Footer */}
         <div className="p-5 border-t border-gray-100 space-y-2">
           <button
             onClick={handleSave}
@@ -98,18 +131,21 @@ export default function OverridePanel({ member, date, overrides, onSet, onRemove
           >
             {saving ? 'Saving…' : 'Save override'}
           </button>
+
+          {/* Reset to schedule — only when override exists */}
           {override && (
             <button
-              onClick={handleClear}
+              onClick={handleReset}
               disabled={saving}
-              className="w-full border border-red-200 text-red-500 rounded-lg py-2 text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+              className="w-full border border-gray-200 text-gray-500 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 hover:text-gray-700 hover:border-gray-300 disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
-              Clear override
+              <span>↺</span> Reset to schedule
             </button>
           )}
+
           <button
             onClick={onClose}
-            className="w-full border border-gray-200 text-gray-500 rounded-lg py-2 text-sm font-medium hover:bg-gray-50"
+            className="w-full text-gray-400 hover:text-gray-600 py-1.5 text-sm"
           >
             Cancel
           </button>

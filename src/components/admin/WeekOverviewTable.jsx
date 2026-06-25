@@ -1,17 +1,18 @@
 import { useState } from 'react'
-import { getAttendanceStatus, getWeekDates, formatDate } from '../../lib/scheduleUtils'
+import { getAttendanceStatus, getWeekDates, formatDate, getHoliday } from '../../lib/scheduleUtils'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 
-export default function WeekOverviewTable({ members, overrides, weekStart }) {
+export default function WeekOverviewTable({ members, overrides, holidays, weekStart }) {
   const [drillDown, setDrillDown] = useState(null) // { dayIdx, status }
   const weekDates = getWeekDates(weekStart)
 
   const stats = weekDates.map(date => {
-    const wfo = members.filter(m => getAttendanceStatus(m, date, overrides) === 'wfo')
-    const wfh = members.filter(m => getAttendanceStatus(m, date, overrides) === 'wfh')
-    const leave = members.filter(m => getAttendanceStatus(m, date, overrides) === 'leave')
-    return { wfo, wfh, leave }
+    const wfo = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'wfo')
+    const wfh = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'wfh')
+    const leave = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'leave')
+    const holiday = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'holiday')
+    return { wfo, wfh, leave, holiday, holidayInfo: getHoliday(date, holidays) }
   })
 
   const drillMembers = drillDown
@@ -28,8 +29,15 @@ export default function WeekOverviewTable({ members, overrides, weekStart }) {
           <thead>
             <tr className="border-b border-gray-100">
               <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 w-24"> </th>
-              {DAY_LABELS.map(d => (
-                <th key={d} className="px-3 py-2 text-xs font-semibold text-gray-500">{d}</th>
+              {DAY_LABELS.map((d, i) => (
+                <th key={d} className="px-3 py-2 text-xs font-semibold text-gray-500">
+                  {d}
+                  {stats[i].holidayInfo && (
+                    <div className="text-[10px] font-normal text-sky-600 truncate max-w-[80px]" title={stats[i].holidayInfo.name_en}>
+                      {stats[i].holidayInfo.name_en}
+                    </div>
+                  )}
+                </th>
               ))}
             </tr>
           </thead>
@@ -38,6 +46,7 @@ export default function WeekOverviewTable({ members, overrides, weekStart }) {
               { key: 'wfo', label: 'In office', colorClass: 'text-emerald-600' },
               { key: 'wfh', label: 'WFH', colorClass: 'text-gray-500' },
               { key: 'leave', label: 'On leave', colorClass: 'text-amber-600' },
+              { key: 'holiday', label: 'Holiday', colorClass: 'text-sky-600' },
             ].map(({ key, label, colorClass }) => (
               <tr key={key} className="border-b border-gray-50">
                 <td className="px-4 py-2 text-xs font-medium text-gray-500">{label}</td>
@@ -70,7 +79,7 @@ export default function WeekOverviewTable({ members, overrides, weekStart }) {
       {drillDown && (
         <div className="border-t border-gray-100 p-4 bg-gray-50">
           <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
-            {DAY_LABELS[drillDown.dayIdx]} — {drillDown.status === 'wfo' ? 'In Office' : drillDown.status === 'wfh' ? 'WFH' : 'On Leave'}
+            {DAY_LABELS[drillDown.dayIdx]} — {{ wfo: 'In Office', wfh: 'WFH', leave: 'On Leave', holiday: 'Holiday' }[drillDown.status]}
           </div>
           {drillMembers.length === 0 ? (
             <div className="text-xs text-gray-400">No one in this category</div>

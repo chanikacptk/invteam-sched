@@ -1,14 +1,14 @@
-import { getAttendanceStatus, formatDate, PAIR_COLORS, PAIR_COLOR_CLASSES } from '../../lib/scheduleUtils'
+import { getAttendanceStatus, formatDate, getHoliday, PAIR_COLORS, PAIR_COLOR_CLASSES } from '../../lib/scheduleUtils'
 
 export const DESK_SLOTS = [
-  // Cluster Left
-  { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 },
-  { row: 0, col: 3 }, { row: 0, col: 4 }, { row: 0, col: 5 },
-  { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 },
-  { row: 1, col: 3 }, { row: 1, col: 4 }, { row: 1, col: 5 },
-  // Cluster Right
-  { row: 4, col: 6 }, { row: 4, col: 7 }, { row: 4, col: 8 },
-  { row: 5, col: 6 }, { row: 5, col: 7 }, { row: 5, col: 8 },
+  // Top block — irregular shape, overlaps cols 4-5 with bottom block
+  { row: 0, col: 6 }, { row: 0, col: 7 },
+  { row: 1, col: 4 }, { row: 1, col: 5 }, { row: 1, col: 6 }, { row: 1, col: 7 },
+  // Bottom block
+  { row: 4, col: 0 }, { row: 4, col: 1 }, { row: 4, col: 2 },
+  { row: 4, col: 3 }, { row: 4, col: 4 }, { row: 4, col: 5 },
+  { row: 5, col: 0 }, { row: 5, col: 1 }, { row: 5, col: 2 },
+  { row: 5, col: 3 }, { row: 5, col: 4 }, { row: 5, col: 5 },
 ]
 
 const ROWS = 6
@@ -23,8 +23,9 @@ function getPairColor(memberName, pairs) {
   return PAIR_COLOR_CLASSES[PAIR_COLORS[pair.color_idx ?? 0] || 'violet']
 }
 
-function DayFloorGrid({ date, dayLabel, members, pairs = [], overrides, onDeskClick, isToday }) {
+function DayFloorGrid({ date, dayLabel, members, pairs = [], overrides, holidays, onDeskClick, isToday }) {
   const deskSet = new Set(DESK_SLOTS.map(d => deskKey(d.row, d.col)))
+  const holiday = getHoliday(date, holidays)
 
   const memberByDesk = {}
   members.forEach(m => {
@@ -33,9 +34,10 @@ function DayFloorGrid({ date, dayLabel, members, pairs = [], overrides, onDeskCl
     }
   })
 
-  const wfoCount = members.filter(m => getAttendanceStatus(m, date, overrides) === 'wfo').length
-  const wfhCount = members.filter(m => getAttendanceStatus(m, date, overrides) === 'wfh').length
-  const leaveCount = members.filter(m => getAttendanceStatus(m, date, overrides) === 'leave').length
+  const wfoCount = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'wfo').length
+  const wfhCount = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'wfh').length
+  const leaveCount = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'leave').length
+  const holidayCount = members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'holiday').length
 
   const cells = []
   for (let row = 0; row < ROWS; row++) {
@@ -63,22 +65,20 @@ function DayFloorGrid({ date, dayLabel, members, pairs = [], overrides, onDeskCl
         continue
       }
 
-      const status = getAttendanceStatus(member, date, overrides)
+      const status = getAttendanceStatus(member, date, overrides, holidays)
       const pairColor = status === 'wfo' ? getPairColor(member.name, pairs) : null
       const initials = member.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
       const firstName = member.name.split(' ')[0]
 
       let chipClass = ''
-      let chipStyle = {}
       if (pairColor) {
-        chipClass = `border rounded-lg cursor-pointer hover:opacity-80 transition-opacity`
-        chipStyle = { background: pairColor.bg.replace('bg-', ''), borderColor: '' }
-        // use inline via Tailwind class
         chipClass = `${pairColor.bg} ${pairColor.text} border ${pairColor.border} rounded-lg cursor-pointer hover:opacity-80 transition-opacity`
       } else if (status === 'wfo') {
         chipClass = 'bg-emerald-500 text-white rounded-lg cursor-pointer hover:opacity-80 transition-opacity'
       } else if (status === 'leave') {
         chipClass = 'bg-amber-400 text-white rounded-lg cursor-pointer hover:opacity-80 transition-opacity'
+      } else if (status === 'holiday') {
+        chipClass = 'bg-sky-100 text-sky-600 rounded-lg cursor-pointer hover:opacity-80 transition-opacity'
       } else {
         chipClass = 'bg-gray-100 text-gray-400 rounded-lg cursor-pointer hover:opacity-80 transition-opacity'
       }
@@ -103,7 +103,7 @@ function DayFloorGrid({ date, dayLabel, members, pairs = [], overrides, onDeskCl
   }
 
   return (
-    <div className={`rounded-xl border p-4 ${isToday ? 'border-emerald-300 bg-emerald-50/40' : 'border-gray-200 bg-white'}`}>
+    <div className={`rounded-xl border p-4 ${holiday ? 'border-sky-300 bg-sky-50/40' : isToday ? 'border-emerald-300 bg-emerald-50/40' : 'border-gray-200 bg-white'}`}>
       {/* Day header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -116,10 +116,14 @@ function DayFloorGrid({ date, dayLabel, members, pairs = [], overrides, onDeskCl
           {isToday && (
             <span className="text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-semibold">today</span>
           )}
+          {holiday && (
+            <span className="text-xs bg-sky-500 text-white px-1.5 py-0.5 rounded-full font-semibold">{holiday.name_en}</span>
+          )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">
           {wfoCount > 0 && <span className="text-emerald-600 font-semibold">{wfoCount} WFO</span>}
           {leaveCount > 0 && <span className="text-amber-600 font-semibold">{leaveCount} leave</span>}
+          {holidayCount > 0 && <span className="text-sky-600 font-semibold">{holidayCount} holiday</span>}
           {wfhCount > 0 && <span className="text-gray-400">{wfhCount} WFH</span>}
         </div>
       </div>
@@ -138,7 +142,7 @@ function DayFloorGrid({ date, dayLabel, members, pairs = [], overrides, onDeskCl
   )
 }
 
-export default function FloorView({ members, pairs = [], overrides, selectedDate, weekDates, onDeskClick }) {
+export default function FloorView({ members, pairs = [], overrides, holidays, selectedDate, weekDates, onDeskClick }) {
   const todayStr = formatDate(new Date())
 
   // Week mode: render 5 day grids
@@ -149,6 +153,7 @@ export default function FloorView({ members, pairs = [], overrides, selectedDate
         <div className="flex items-center gap-4 text-xs text-gray-500 px-1">
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> WFO</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-400 inline-block" /> Leave</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-sky-200 inline-block" /> Holiday</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-200 inline-block" /> WFH</span>
           {pairs.length > 0 && pairs.map(pair => {
             const cls = PAIR_COLOR_CLASSES[PAIR_COLORS[pair.color_idx ?? 0] || 'violet']
@@ -169,6 +174,7 @@ export default function FloorView({ members, pairs = [], overrides, selectedDate
             members={members}
             pairs={pairs}
             overrides={overrides}
+            holidays={holidays}
             onDeskClick={onDeskClick}
             isToday={formatDate(date) === todayStr}
           />
@@ -184,6 +190,7 @@ export default function FloorView({ members, pairs = [], overrides, selectedDate
       <div className="flex items-center gap-4 text-xs text-gray-500 px-1">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> WFO</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-400 inline-block" /> Leave</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-sky-200 inline-block" /> Holiday</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-200 inline-block" /> WFH</span>
       </div>
       <DayFloorGrid
@@ -192,6 +199,7 @@ export default function FloorView({ members, pairs = [], overrides, selectedDate
         members={members}
         pairs={pairs}
         overrides={overrides}
+        holidays={holidays}
         onDeskClick={onDeskClick}
         isToday={formatDate(date) === todayStr}
       />

@@ -1,4 +1,4 @@
-import { getAttendanceStatus, formatDate, PAIR_COLORS, PAIR_COLOR_CLASSES } from '../../lib/scheduleUtils'
+import { getAttendanceStatus, formatDate, getHoliday, PAIR_COLORS, PAIR_COLOR_CLASSES } from '../../lib/scheduleUtils'
 
 const MAX_AVATARS = 5
 
@@ -11,7 +11,7 @@ function getAvatarClass(memberName, pairs) {
   return 'bg-emerald-500'
 }
 
-export default function MonthCalendar({ members, pairs = [], overrides, year, month, onDayClick }) {
+export default function MonthCalendar({ members, pairs = [], overrides, holidays, year, month, onDayClick }) {
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
   const startPad = (firstDay.getDay() + 6) % 7 // Monday-first
@@ -44,9 +44,10 @@ export default function MonthCalendar({ members, pairs = [], overrides, year, mo
           const dow = date.getDay() // 0=Sun, 6=Sat
           const isWeekend = dow === 0 || dow === 6
           const isFriday = dow === 5
+          const holiday = getHoliday(date, holidays)
 
-          const wfoMembers = (!isWeekend && !isFriday)
-            ? members.filter(m => getAttendanceStatus(m, date, overrides) === 'wfo')
+          const wfoMembers = (!isWeekend && !isFriday && !holiday)
+            ? members.filter(m => getAttendanceStatus(m, date, overrides, holidays) === 'wfo')
             : []
           const shown = wfoMembers.slice(0, MAX_AVATARS)
           const extra = wfoMembers.length - MAX_AVATARS
@@ -56,12 +57,17 @@ export default function MonthCalendar({ members, pairs = [], overrides, year, mo
               key={dateStr}
               className={`bg-white min-h-[72px] p-1.5 flex flex-col cursor-pointer transition-colors
                 ${isWeekend || isFriday ? 'opacity-40 cursor-default' : 'hover:bg-gray-50'}
+                ${holiday ? 'bg-sky-50' : ''}
                 ${isToday ? 'ring-2 ring-inset ring-emerald-500' : ''}`}
               onClick={() => (!isWeekend && !isFriday) && onDayClick && onDayClick(date)}
             >
-              <div className={`text-xs font-semibold mb-1 ${isToday ? 'text-emerald-700' : 'text-gray-600'}`}>
+              <div className={`text-xs font-semibold mb-1 ${isToday ? 'text-emerald-700' : holiday ? 'text-sky-600' : 'text-gray-600'}`}>
                 {date.getDate()}
               </div>
+
+              {holiday && (
+                <div className="text-xs text-sky-600 leading-tight truncate" title={holiday.name_en}>{holiday.name_en}</div>
+              )}
 
               {/* Avatar initials row */}
               {shown.length > 0 && (
