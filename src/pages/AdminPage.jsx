@@ -1,22 +1,22 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useMembers } from '../hooks/useMembers'
 import { usePairs } from '../hooks/usePairs'
 import { useOverrides } from '../hooks/useOverrides'
 import { useHolidays } from '../hooks/useHolidays'
 import { useDrafts } from '../hooks/useDrafts'
-import { useAuth } from '../hooks/useAuth'
 import MemberList from '../components/admin/MemberList'
 import MemberModal from '../components/admin/MemberModal'
 import PairList from '../components/admin/PairList'
 import WeekOverviewTable from '../components/admin/WeekOverviewTable'
 import HolidayList from '../components/admin/HolidayList'
 import FloorView from '../components/viewer/FloorView'
+import WeekCalendar from '../components/viewer/WeekCalendar'
+import MonthCalendar from '../components/viewer/MonthCalendar'
 import OverridePanel from '../components/admin/OverridePanel'
 import StatsBar from '../components/viewer/StatsBar'
 import { StatsBarSkeleton, ListSkeleton } from '../components/Skeleton'
 import { toast } from '../components/Toast'
-import { getWeekDates, formatDate } from '../lib/scheduleUtils'
+import { getWeekDates, formatDate, getAttendanceStatus, getHoliday } from '../lib/scheduleUtils'
 
 const TABS = [
   { key: 'schedule', label: 'Schedule' },
@@ -26,12 +26,12 @@ const TABS = [
 ]
 
 export default function AdminPage() {
-  const navigate = useNavigate()
-  const { signOut } = useAuth()
   const [activeTab, setActiveTab] = useState('schedule')
+  const [scheduleView, setScheduleView] = useState('floor')  // 'floor' | 'week' | 'month'
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [overridePanel, setOverridePanel] = useState(null)   // { member, date } | null
   const [addMemberDesk, setAddMemberDesk] = useState(null)  // { desk_row, desk_col } | null
+  const [dayPanel, setDayPanel] = useState(null)             // Date | null
 
   const [refreshing, setRefreshing] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -47,8 +47,8 @@ export default function AdminPage() {
   // Expand range to cover visible week (may cross month boundary, e.g. Jun 29 – Jul 3)
   const weekStart = formatDate(weekDates[0])
   const weekEnd   = formatDate(weekDates[4])
-  const overrideFrom = weekStart < monthStart ? weekStart : monthStart
-  const overrideTo   = weekEnd   > monthEnd   ? weekEnd   : monthEnd
+  const overrideFrom = scheduleView === 'month' ? monthStart : (weekStart < monthStart ? weekStart : monthStart)
+  const overrideTo   = scheduleView === 'month' ? monthEnd   : (weekEnd   > monthEnd   ? weekEnd   : monthEnd)
   const { overrides, setOverride, removeOverride, refresh: refreshOverrides } = useOverrides({ from: overrideFrom, to: overrideTo }, { includeDrafts: true, drafts })
   const { holidays, addHoliday, toggleObserved, deleteHoliday, refresh: refreshHolidays } = useHolidays({ includeDrafts: true, drafts })
 
@@ -75,14 +75,21 @@ export default function AdminPage() {
     await drafts.discardAll()
   }
 
-  const weekLabel = `${weekDates[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${weekDates[4].toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+  const weekLabel  = `${weekDates[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${weekDates[4].toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+  const monthLabel = selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })
+  const periodLabel = scheduleView === 'month' ? monthLabel : weekLabel
 
-  function prevWeek() { const d = new Date(selectedDate); d.setDate(d.getDate() - 7); setSelectedDate(d) }
-  function nextWeek() { const d = new Date(selectedDate); d.setDate(d.getDate() + 7); setSelectedDate(d) }
-
-  async function handleSignOut() {
-    await signOut()
-    navigate('/login')
+  function prevPeriod() {
+    const d = new Date(selectedDate)
+    if (scheduleView === 'month') d.setMonth(d.getMonth() - 1)
+    else d.setDate(d.getDate() - 7)
+    setSelectedDate(d)
+  }
+  function nextPeriod() {
+    const d = new Date(selectedDate)
+    if (scheduleView === 'month') d.setMonth(d.getMonth() + 1)
+    else d.setDate(d.getDate() + 7)
+    setSelectedDate(d)
   }
 
   return (
@@ -138,12 +145,6 @@ export default function AdminPage() {
               <span className={refreshing ? 'animate-spin inline-block' : ''}>↻</span>
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>
-            <button
-              onClick={handleSignOut}
-              className="text-xs text-gray-400 hover:text-gray-600 px-3 py-1.5 border border-gray-200 rounded-lg"
-            >
-              Sign out
-            </button>
           </div>
         </div>
       </div>
@@ -152,9 +153,9 @@ export default function AdminPage() {
         {/* Week nav — schedule tab only */}
         {activeTab === 'schedule' && (
           <div className="flex items-center gap-3">
-            <button onClick={prevWeek} className="p-2 rounded-lg hover:bg-white border border-gray-200 text-gray-500 text-lg leading-none">‹</button>
-            <span className="text-sm font-semibold text-gray-700 flex-1 text-center">{weekLabel}</span>
-            <button onClick={nextWeek} className="p-2 rounded-lg hover:bg-white border border-gray-200 text-gray-500 text-lg leading-none">›</button>
+            <button onClick={prevPeriod} className="p-2 rounded-lg hover:bg-white border border-gray-200 text-gray-500 text-lg leading-none">‹</button>
+            <span className="text-sm font-semibold text-gray-700 flex-1 text-center">{periodLabel}</span>
+            <button onClick={nextPeriod} className="p-2 rounded-lg hover:bg-white border border-gray-200 text-gray-500 text-lg leading-none">›</button>
             <button
               onClick={() => setSelectedDate(new Date())}
               className="text-xs text-emerald-600 font-medium px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-50"
@@ -177,30 +178,73 @@ export default function AdminPage() {
                 <StatsBar members={members} overrides={overrides} holidays={holidays} selectedDate={selectedDate} />
                 <WeekOverviewTable members={members} overrides={overrides} holidays={holidays} weekStart={selectedDate} />
 
-                {/* Floor view — one grid per day, scroll on mobile */}
-                <div className="overflow-x-auto">
-                  <div className="min-w-[600px]">
-                    <FloorView
-                      members={members}
-                      pairs={pairs}
-                      overrides={overrides}
-                      holidays={holidays}
-                      weekDates={weekDates}
-                      onDeskClick={(member, dateOrSlot, date) => {
-                        if (member) {
-                          // member chip → open override panel for that specific day
-                          setOverridePanel({ member, date: date || dateOrSlot })
-                        } else if (dateOrSlot?.row != null) {
-                          // empty desk → open add-member modal pre-filled with desk position
-                          setAddMemberDesk({ desk_row: dateOrSlot.row, desk_col: dateOrSlot.col })
-                        }
-                      }}
-                    />
-                  </div>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+                  {[['floor', 'Floor'], ['week', 'Week'], ['month', 'Month']].map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setScheduleView(key)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                        ${scheduleView === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-                <p className="text-xs text-gray-400 text-center">
-                  Click a member chip to override attendance · Click + to add a member to that desk
-                </p>
+
+                {scheduleView === 'floor' && (
+                  <>
+                    {/* Floor view — one grid per day, scroll on mobile */}
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[600px]">
+                        <FloorView
+                          members={members}
+                          pairs={pairs}
+                          overrides={overrides}
+                          holidays={holidays}
+                          weekDates={weekDates}
+                          onDeskClick={(member, dateOrSlot, date) => {
+                            if (member) {
+                              // member chip → open override panel for that specific day
+                              setOverridePanel({ member, date: date || dateOrSlot })
+                            } else if (dateOrSlot?.row != null) {
+                              // empty desk → open add-member modal pre-filled with desk position
+                              setAddMemberDesk({ desk_row: dateOrSlot.row, desk_col: dateOrSlot.col })
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center">
+                      Click a member chip to override attendance · Click + to add a member to that desk
+                    </p>
+                  </>
+                )}
+
+                {scheduleView === 'week' && (
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[500px]">
+                      <WeekCalendar
+                        members={members}
+                        overrides={overrides}
+                        holidays={holidays}
+                        weekStart={selectedDate}
+                        onDayClick={setDayPanel}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {scheduleView === 'month' && (
+                  <MonthCalendar
+                    members={members}
+                    pairs={pairs}
+                    overrides={overrides}
+                    holidays={holidays}
+                    year={selectedDate.getFullYear()}
+                    month={selectedDate.getMonth()}
+                    onDayClick={setDayPanel}
+                  />
+                )}
               </div>
             )}
 
@@ -246,6 +290,58 @@ export default function AdminPage() {
           onSave={async (data) => { await addMember(data); setAddMemberDesk(null) }}
           onClose={() => setAddMemberDesk(null)}
         />
+      )}
+
+      {/* Day side panel — week view drill-down, click a name to override */}
+      {dayPanel && (
+        <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-end" onClick={() => setDayPanel(null)}>
+          <div
+            className="bg-white h-full w-80 shadow-xl p-5 overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="font-bold text-gray-900 text-sm">
+                {dayPanel.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </div>
+              <button onClick={() => setDayPanel(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+
+            {getHoliday(dayPanel, holidays) && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700 mb-4">
+                🇹🇭 {getHoliday(dayPanel, holidays).name_en}
+              </div>
+            )}
+
+            {[
+              { status: 'wfo',     label: 'In Office', color: 'emerald' },
+              { status: 'leave',   label: 'On Leave',  color: 'amber' },
+              { status: 'holiday', label: 'Holiday',   color: 'sky' },
+              { status: 'wfh',     label: 'WFH',       color: 'gray' },
+            ].map(({ status, label, color }) => {
+              const group = members.filter(m => getAttendanceStatus(m, dayPanel, overrides, holidays) === status)
+              if (group.length === 0) return null
+              return (
+                <div key={status} className="mb-5">
+                  <div className={`text-xs font-semibold text-${color}-600 uppercase tracking-wide mb-2`}>
+                    {label} ({group.length})
+                  </div>
+                  <div className="space-y-1">
+                    {group.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => { setOverridePanel({ member: m, date: dayPanel }); setDayPanel(null) }}
+                        className={`w-full text-left text-sm px-3 py-1.5 rounded-lg font-medium hover:opacity-80 bg-${color}-50 text-${color}-800`}
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+            <p className="text-xs text-gray-400 text-center mt-2">Click a name to set an override</p>
+          </div>
+        </div>
       )}
 
       {/* Override panel — slide-in from right */}
