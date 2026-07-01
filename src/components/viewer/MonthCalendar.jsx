@@ -3,7 +3,7 @@ import { getAttendanceStatus, formatDate, getHoliday } from '../../lib/scheduleU
 // Fixed 2-row seating layout. null = black separator dot between clusters.
 // Names must match member.name in DB (case-insensitive, spaces stripped for lookup).
 const SEAT_ROWS = [
-  ['Aoi', 'Rynn', 'Beam', 'Anne', 'Palm', 'Nan', null, '_', null, 'Som-O', 'Pang'],
+  ['Aoi', 'Rynn', 'Beam', 'Anne', 'Palm', 'Nan', null, null, 'Som-O', 'Pang'],
   ['Bank', 'Yot', 'Beam JR', null, 'Yada', 'Sai', null, 'Chanika', 'Apinya', 'Mix'],
 ]
 
