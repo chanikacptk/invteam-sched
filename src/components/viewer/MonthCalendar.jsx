@@ -17,31 +17,32 @@ function statusDotClass(status) {
 }
 
 function SeatGrid({ members, date, overrides, holidays, isFriday }) {
-  // Build name → member lookup
   const byName = {}
   members.forEach(m => { byName[normName(m.name)] = m })
 
   return (
-    <div className="flex flex-col gap-[3px] mt-1">
+    <div className="flex flex-col gap-[2px] mt-1">
       {SEAT_ROWS.map((row, ri) => (
-        <div key={ri} className="flex gap-[2px] items-center">
+        <div key={ri} className="flex gap-[1px] items-center">
           {row.map((slot, si) => {
             if (slot === null) {
-              // black separator dot
-              return <span key={`sep-${si}`} className="w-2 h-2 rounded-full bg-gray-800 flex-shrink-0" />
+              return <span key={`sep-${si}`} className="w-4 h-4 rounded-full bg-gray-800 flex-shrink-0" />
             }
             const member = byName[normName(slot)]
             if (!member) {
-              // member not in DB yet — show empty placeholder
-              return <span key={slot} className="w-2 h-2 rounded-full border border-gray-200 flex-shrink-0" />
+              return <span key={slot} className="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" />
             }
             const status = isFriday ? 'wfh' : getAttendanceStatus(member, date, overrides, holidays)
+            const initials = member.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
             return (
               <span
                 key={slot}
                 title={`${member.name}: ${status.toUpperCase()}`}
-                className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDotClass(status)}`}
-              />
+                className={`w-4 h-4 rounded-full flex-shrink-0 text-white flex items-center justify-center font-bold ${statusDotClass(status)}`}
+                style={{ fontSize: '7px' }}
+              >
+                {initials}
+              </span>
             )
           })}
         </div>
@@ -101,7 +102,7 @@ export default function MonthCalendar({ members, pairs = [], overrides, holidays
               return (
                 <div
                   key={dateStr}
-                  className={`bg-white p-1.5 flex flex-col transition-colors
+                  className={`bg-white min-h-[80px] p-1.5 flex flex-col transition-colors
                     ${!inMonth ? 'opacity-30' : ''}
                     ${isFriday ? 'bg-gray-50' : ''}
                     ${holiday ? 'bg-sky-50' : ''}
