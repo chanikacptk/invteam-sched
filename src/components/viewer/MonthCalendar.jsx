@@ -3,7 +3,7 @@ import { getAttendanceStatus, formatDate, getHoliday } from '../../lib/scheduleU
 // Fixed 2-row seating layout. null = black separator dot between clusters.
 // Names must match member.name in DB (case-insensitive, spaces stripped for lookup).
 const SEAT_ROWS = [
-  ['Aoi', 'Rynn', 'Beam', 'Anne', 'Palm', 'Nan', null, 'Som-O', 'Pang'],
+  ['Aoi', 'Rynn', 'Beam', 'Anne', 'Palm', 'Nan', null, '_', null, 'Som-O', 'Pang'],
   ['Bank', 'Yot', 'Beam JR', null, 'Yada', 'Sai', null, 'Chanika', 'Apinya', 'Mix'],
 ]
 
@@ -27,6 +27,9 @@ function SeatGrid({ members, date, overrides, holidays, isFriday }) {
           {row.map((slot, si) => {
             if (slot === null) {
               return <span key={`sep-${si}`} className="w-4 h-4 rounded-full bg-gray-800 flex-shrink-0" />
+            }
+            if (slot === '_') {
+              return <span key={`empty-${si}`} className="w-4 h-4 rounded-full border border-dashed border-gray-200 flex-shrink-0" />
             }
             const member = byName[normName(slot)]
             if (!member) {
